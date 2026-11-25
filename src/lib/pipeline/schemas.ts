@@ -118,4 +118,6 @@ export interface GeneratedBundle {
   report: StrategyReport;
   detailContent: DetailPageContent;
   detailHtml: string;
+  mainImages?: string[];
+  sourcingProvider?: "tmapi" | "rapidapi" | "onebound" | "none";
 }

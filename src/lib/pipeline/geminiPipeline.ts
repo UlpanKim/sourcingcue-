@@ -6,6 +6,7 @@ import {
 } from "./schemas";
 import { renderDetailHtml } from "./detailTemplate";
 import { buildFallbackPipelineOutput } from "./fallback";
+import { fetch1688Product } from "../sourcing/adapter1688";
 
 const DEFAULT_MODEL = "gemini-3.5-flash";
 
@@ -29,6 +30,8 @@ export async function runGeminiSourcingPipeline(
   let isLiveGemini = false;
   let usedModel = `${configuredModel} (fixture)`;
 
+  const sourced = await fetch1688Product(input.sourceUrl);
+
   if (apiKey) {
     try {
       const systemPrompt = `당신은 한국 쿠팡 40~50대 셀러를 돕는 1688 소싱 및 상세페이지 전문 컨설턴트입니다.
@@ -38,6 +41,7 @@ export async function runGeminiSourcingPipeline(
 1. searchTags는 정확히 20개의 한국어 쿠팡 검색 태그 배열로 작성하세요.
 2. keySellingPoints는 정확히 3개, benefits는 정확히 3개, titleCandidates는 3~5개로 작성하세요.
 3. '1위', '완벽', '100%' 같은 무증빙 최상급 과장표현은 금지하고 실측 수치 근거를 포함하세요.
+3-1. sourced1688 데이터가 있으면 실제 1688 상품명·가격(CNY)·속성·SKU를 근거로 분석하고 estimatedUnitCostCny에 반영하세요.
 4. 반드시 아래 JSON 스키마 구조를 정확히 따르세요:
 {
   "report": {
@@ -69,6 +73,20 @@ export async function runGeminiSourcingPipeline(
         shippingMode: input.shippingMode === "rocket_growth" ? "로켓그로스" : "일반배송",
         brandName: sanitizeUntrustedText(input.brandName || "데일리굿즈"),
         productHint: sanitizeUntrustedText(input.productHint || "URL 기반 일반 생활/패션 소싱 상품"),
+        ...(sourced
+          ? {
+              sourced1688: {
+                title: sanitizeUntrustedText(sourced.title),
+                priceCny: sourced.priceCny,
+                priceRange: sourced.priceRange.map(sanitizeUntrustedText),
+                attributes: sourced.attributes.map((a) => ({
+                  name: sanitizeUntrustedText(a.name),
+                  value: sanitizeUntrustedText(a.value),
+                })),
+                skuSummary: sourced.skuSummary.map(sanitizeUntrustedText),
+              },
+            }
+          : {}),
       });
 
       const res = await fetch(
@@ -168,6 +186,7 @@ export async function runGeminiSourcingPipeline(
   const detailHtml = renderDetailHtml(
     parsed.detailContent,
     input.brandName || "셀러원큐 셀렉트",
+    sourced?.mainImages[0],
   );
 
   return {
@@ -181,5 +200,7 @@ export async function runGeminiSourcingPipeline(
     report: parsed.report,
     detailContent: parsed.detailContent,
     detailHtml,
+    mainImages: sourced?.mainImages ?? [],
+    sourcingProvider: sourced?.provider ?? "none",
   };
 }

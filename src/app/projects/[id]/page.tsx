@@ -125,6 +125,24 @@ export default function ProjectWorkspacePage() {
           typeof raw.projectId === "string" && /^[a-zA-Z0-9_-]{1,40}$/.test(raw.projectId)
             ? raw.projectId
             : "demo";
+        const safeMainImages = Array.isArray(raw.mainImages)
+          ? raw.mainImages
+              .filter((u): u is string => {
+                if (typeof u !== "string") return false;
+                try {
+                  return new URL(u).protocol === "https:";
+                } catch {
+                  return false;
+                }
+              })
+              .slice(0, 6)
+          : [];
+        const safeProvider: GeneratedBundle["sourcingProvider"] =
+          raw.sourcingProvider === "tmapi" ||
+          raw.sourcingProvider === "rapidapi" ||
+          raw.sourcingProvider === "onebound"
+            ? raw.sourcingProvider
+            : "none";
         const hydrated: GeneratedBundle = {
           projectId: safeProjectId,
           sourceUrl: typeof raw.sourceUrl === "string" ? raw.sourceUrl : "",
@@ -136,7 +154,13 @@ export default function ProjectWorkspacePage() {
           report: reportRes.data,
           detailContent: detailRes.data,
           // Always recompute HTML deterministically from validated schema data
-          detailHtml: renderDetailHtml(detailRes.data, safeBrand || "셀러원큐 셀렉트"),
+          detailHtml: renderDetailHtml(
+            detailRes.data,
+            safeBrand || "셀러원큐 셀렉트",
+            safeMainImages[0],
+          ),
+          mainImages: safeMainImages,
+          sourcingProvider: safeProvider,
         };
         setBundle(hydrated);
         setUnitCostKrw(hydrated.report.pricingGuide.estimatedUnitCostKrw);
@@ -179,14 +203,22 @@ export default function ProjectWorkspacePage() {
     setBundle({
       ...bundle,
       detailContent: updatedContent,
-      detailHtml: renderDetailHtml(updatedContent, bundle.brandName || "셀러원큐 셀렉트"),
+      detailHtml: renderDetailHtml(
+        updatedContent,
+        bundle.brandName || "셀러원큐 셀렉트",
+        bundle.mainImages?.[0],
+      ),
     });
     setEditNotice("직접 텍스트 수정이 반영되었습니다. (AI API 호출 없음 · 무제한 무료)");
   }
 
   function handleDownloadHtml() {
     const safeId = /^[a-zA-Z0-9_-]{1,40}$/.test(bundle.projectId) ? bundle.projectId : "detail";
-    const safeHtml = renderDetailHtml(bundle.detailContent, bundle.brandName || "셀러원큐 셀렉트");
+    const safeHtml = renderDetailHtml(
+      bundle.detailContent,
+      bundle.brandName || "셀러원큐 셀렉트",
+      bundle.mainImages?.[0],
+    );
     const blob = new Blob([safeHtml], { type: "text/html;charset=utf-8" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
@@ -214,6 +246,11 @@ export default function ProjectWorkspacePage() {
             <span className="rounded-full bg-slate-100 px-3 py-0.5 text-xs font-bold text-slate-600">
               {bundle.isLiveGemini ? `AI 실분석 (${bundle.usedModel})` : "샘플 미리보기 모드"}
             </span>
+            {bundle.sourcingProvider && bundle.sourcingProvider !== "none" && (
+              <span className="rounded-full bg-emerald-100 px-3 py-0.5 text-xs font-extrabold text-emerald-800">
+                {`1688 실데이터 (${bundle.sourcingProvider})`}
+              </span>
+            )}
           </div>
           <h1 className="mt-2 text-xl font-black text-slate-900 sm:text-2xl">
             {bundle.report.productNameKo}
@@ -484,14 +521,14 @@ export default function ProjectWorkspacePage() {
           </div>
 
           <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
-            {IMAGE_SLOTS.map((slot) => (
+            {IMAGE_SLOTS.map((slot, idx) => (
               <div
                 key={slot.id}
                 className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm"
               >
                 <div className="relative aspect-square overflow-hidden bg-slate-100">
                   <img
-                    src={slot.imgUrl}
+                    src={bundle.mainImages?.[idx] ?? slot.imgUrl}
                     alt={slot.title}
                     className="h-full w-full object-cover"
                   />
