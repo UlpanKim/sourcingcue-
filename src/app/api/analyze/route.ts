@@ -3,6 +3,8 @@ import { SourcingInputSchema } from "@/lib/pipeline/schemas";
 import { runGeminiSourcingPipeline } from "@/lib/pipeline/geminiPipeline";
 import { checkRateLimit, getClientIp, isPayloadTooLarge } from "@/lib/security/rateLimit";
 
+export const maxDuration = 60;
+
 export async function POST(req: Request) {
   if (isPayloadTooLarge(req, 4096)) {
     return NextResponse.json({ error: "요청 크기가 허용 한도를 초과했습니다." }, { status: 413 });

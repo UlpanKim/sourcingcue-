@@ -90,7 +90,7 @@ export function renderDetailHtml(
   <title>${escapeHtml(content.heroHeadline)}</title>
 </head>
 <body style="margin:0;padding:0;background:#ffffff;font-family:'Pretendard','Noto Sans KR',sans-serif;">
-  <div id="detail-canvas" style="width:430px;margin:0 auto;background:#ffffff;color:#0f172a;">
+  <div id="detail-canvas" style="width:100%;max-width:430px;margin:0 auto;box-sizing:border-box;background:#ffffff;color:#0f172a;">
     <!-- Screen 1: Hero -->
     <section style="padding:36px 24px 32px;background:linear-gradient(180deg,#0f172a 0%,#1e293b 100%);color:#ffffff;text-align:center;">
       <div style="display:inline-block;padding:6px 14px;border-radius:999px;background:#2563eb;font-size:12px;font-weight:700;margin-bottom:14px;">
