@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 vi.mock("server-only", () => ({}));
 import {
   extract1688ItemId,
+  resolveTmapiApiKey,
   fetch1688Product,
   sanitizeImageUrls,
 } from "../src/lib/sourcing/adapter1688";
@@ -9,6 +10,9 @@ import {
 const PROVIDER_ENV_KEYS = [
   "SOURCING_1688_PROVIDER",
   "TMAPI_API_KEY",
+  "TMAPI_API_TEST_KEY",
+  "TMAPI_API_LIVE_KEY",
+  "TMAPI_USE_TEST",
   "RAPIDAPI_KEY",
   "RAPIDAPI_1688_HOST",
   "RAPIDAPI_1688_PATH",
@@ -85,8 +89,8 @@ describe("fetch1688Product", () => {
       code: 200,
       data: {
         title: "접이식 캠핑 의자",
-        price: "35.50",
-        price_range: [{ begin_num: 2, price: "35.5" }],
+        price_info: { price: "35.50", price_min: "35.50", price_max: "36.00" },
+        tiered_price_info: { begin_num: 2, prices: [{ beginAmount: "2", price: "35.5" }] },
         product_props: [{ name: "재질", value: "옥스포드" }],
         sku_props: [{ prop_name: "색상", values: [{ name: "블랙" }, { name: "카키" }] }],
         main_imgs: ["http://cbu01.alicdn.com/img/1.jpg", "https://evil.com/2.jpg"],
@@ -104,7 +108,7 @@ describe("fetch1688Product", () => {
     expect(p!.mainImages).toEqual(["https://cbu01.alicdn.com/img/1.jpg"]);
     const [url, init] = fn.mock.calls[0] as unknown as [string, RequestInit];
     expect(url).toBe("https://api.tmapi.top/1688/item_detail?item_id=849201948271&language=ko");
-    expect((init.headers as Record<string, string>).apiToken).toBe("test-tmapi");
+    expect((init.headers as Record<string, string>).apikey).toBe("test-tmapi");
   });
 
   it("normalizes a RapidAPI response with item wrapper", async () => {
@@ -150,5 +154,46 @@ describe("fetch1688Product", () => {
     vi.spyOn(console, "warn").mockImplementation(() => {});
     expect(await fetch1688Product(URL_1688)).toBeNull();
     expect(String((fn.mock.calls[0] as unknown as [string])[0])).toContain("api-gw.onebound.cn");
+  });
+});
+
+describe("resolveTmapiApiKey", () => {
+  const setKeys = () => {
+    process.env.TMAPI_API_TEST_KEY = "k-test";
+    process.env.TMAPI_API_LIVE_KEY = "k-live";
+    process.env.TMAPI_API_KEY = "k-base";
+  };
+  const withNodeEnv = (v: string) => vi.stubEnv("NODE_ENV", v);
+
+  it("prefers test key outside production", () => {
+    setKeys();
+    withNodeEnv("development");
+    expect(resolveTmapiApiKey()).toBe("k-test");
+    delete process.env.TMAPI_API_TEST_KEY;
+    expect(resolveTmapiApiKey()).toBe("k-base");
+    delete process.env.TMAPI_API_KEY;
+    expect(resolveTmapiApiKey()).toBe("k-live");
+  });
+
+  it("prefers live key in production unless TMAPI_USE_TEST=true", () => {
+    setKeys();
+    withNodeEnv("production");
+    expect(resolveTmapiApiKey()).toBe("k-live");
+    process.env.TMAPI_USE_TEST = "true";
+    expect(resolveTmapiApiKey()).toBe("k-test");
+    delete process.env.TMAPI_USE_TEST;
+    delete process.env.TMAPI_API_LIVE_KEY;
+    expect(resolveTmapiApiKey()).toBe("k-base");
+  });
+
+  it("sends the selected key as apikey header and rejects non-200 codes", async () => {
+    process.env.TMAPI_API_LIVE_KEY = "k-live";
+    process.env.TMAPI_API_TEST_KEY = "k-test";
+    withNodeEnv("production");
+    const fn = mockFetchJson({ code: 4393, message: "insufficient quota" });
+    expect(await fetch1688Product(URL_1688)).toBeNull();
+    const [, init] = fn.mock.calls[0] as unknown as [string, RequestInit];
+    expect((init.headers as Record<string, string>).apikey).toBe("k-live");
+    vi.unstubAllEnvs();
   });
 });

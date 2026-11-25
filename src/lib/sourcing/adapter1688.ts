@@ -146,7 +146,7 @@ function normalizePriceRange(raw: unknown): string[] {
     } else if (Array.isArray(r) && r.length >= 2) {
       out.push(`${str(r[0], 20)}개 이상: ¥${str(r[1], 20)}`);
     } else if (isObj(r)) {
-      const qty = str(r.begin_num ?? r.min_qty ?? r.startQuantity ?? r.quantity, 20);
+      const qty = str(r.beginAmount ?? r.beginAmount ?? r.begin_num ?? r.min_qty ?? r.startQuantity ?? r.quantity, 20);
       const price = str(r.price, 20);
       if (price) out.push(qty ? `${qty}개 이상: ¥${price}` : `¥${price}`);
     }
@@ -173,16 +173,19 @@ function finalize(product: Sourced1688Product): Sourced1688Product | null {
 async function fetchTmapi(itemId: string, apiKey: string): Promise<Sourced1688Product | null> {
   const json = await getJson(
     `https://api.tmapi.top/1688/item_detail?item_id=${encodeURIComponent(itemId)}&language=ko`,
-    { apiToken: apiKey, apikey: apiKey },
+    { apikey: apiKey },
   );
-  const data = isObj(json) && isObj(json.data) ? json.data : null;
+  if (!isObj(json) || (json.code !== undefined && Number(json.code) !== 200)) return null;
+  const data = isObj(json.data) ? json.data : null;
   if (!data) return null;
+  const priceInfo = isObj(data.price_info) ? data.price_info : {};
+  const tiered = isObj(data.tiered_price_info) ? data.tiered_price_info.prices : undefined;
   return finalize({
     itemId,
     provider: "tmapi",
     title: str(data.title, 200),
-    priceCny: toPrice(data.price) ?? toPrice(data.price_min),
-    priceRange: normalizePriceRange(data.price_range ?? data.price_ranges),
+    priceCny: toPrice(priceInfo.price) ?? toPrice(priceInfo.price_min) ?? toPrice(data.price),
+    priceRange: normalizePriceRange(tiered ?? data.price_range ?? data.price_ranges),
     attributes: normalizeAttributes(data.product_props),
     skuSummary: normalizeSkuSummary(data.sku_props),
     mainImages: sanitizeImageUrls(data.main_imgs),
@@ -245,8 +248,18 @@ function env(name: string): string {
   return process.env[name]?.trim() ?? "";
 }
 
+export function resolveTmapiApiKey(): string {
+  const test = env("TMAPI_API_TEST_KEY");
+  const live = env("TMAPI_API_LIVE_KEY");
+  const base = env("TMAPI_API_KEY");
+  if (process.env.NODE_ENV === "production" && process.env.TMAPI_USE_TEST !== "true") {
+    return live || base || test;
+  }
+  return test || base || live;
+}
+
 function isConfigured(p: Sourcing1688Provider): boolean {
-  if (p === "tmapi") return Boolean(env("TMAPI_API_KEY"));
+  if (p === "tmapi") return Boolean(resolveTmapiApiKey());
   if (p === "rapidapi") return Boolean(env("RAPIDAPI_KEY") && env("RAPIDAPI_1688_HOST"));
   return Boolean(env("ONEBOUND_API_KEY") && env("ONEBOUND_API_SECRET"));
 }
@@ -266,7 +279,7 @@ export async function fetch1688Product(sourceUrl: string): Promise<Sourced1688Pr
   const provider = select1688Provider();
   if (!provider) return null;
   try {
-    if (provider === "tmapi") return await fetchTmapi(itemId, env("TMAPI_API_KEY"));
+    if (provider === "tmapi") return await fetchTmapi(itemId, resolveTmapiApiKey());
     if (provider === "rapidapi") {
       return await fetchRapidApi(
         itemId,
