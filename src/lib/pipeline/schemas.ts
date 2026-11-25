@@ -35,11 +35,23 @@ export const StrategyReportSchema = z.object({
   productNameKo: z.string().max(200),
   categoryPath: z.string().max(200),
   marketSnapshot: z.object({
+    maxPriceKrw: z.number().int().positive().optional(),
     avgPriceKrw: z.number().int().positive(),
+    medianPriceKrw: z.number().int().positive().optional(),
+    minPriceKrw: z.number().int().positive().optional(),
     rocketGrowthSharePct: z.number().int().min(0).max(100),
     competitionLevel: z.enum(["낮음", "보통", "높음"]),
     summaryComment: z.string().max(500),
   }),
+  packageSpec: z
+    .object({
+      lengthCm: z.number().positive().max(300),
+      widthCm: z.number().positive().max(300),
+      heightCm: z.number().positive().max(300),
+      weightG: z.number().positive().max(50000),
+      source: z.enum(["1688_extracted", "ai_estimated"]).default("ai_estimated"),
+    })
+    .optional(),
   pricingGuide: z.object({
     estimatedUnitCostCny: z.number().positive(),
     estimatedUnitCostKrw: z.number().int().positive(),

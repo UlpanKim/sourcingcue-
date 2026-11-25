@@ -24,6 +24,7 @@ import {
   type GeneratedBundle,
 } from "@/lib/pipeline/schemas";
 import { formatKrw } from "@/lib/billing/plans";
+import { calculateCoupangFulfillment } from "@/lib/billing/coupangFulfillment";
 
 function createDemoBundle(): GeneratedBundle {
   const sourceUrl =
@@ -105,9 +106,14 @@ export default function ProjectWorkspacePage() {
   const [remainingAiEdits, setRemainingAiEdits] = useState<number>(3);
   const [editNotice, setEditNotice] = useState<string>("");
 
-  // Margin simulator state
+  // Margin & Coupang fulfillment simulator state
   const [unitCostKrw, setUnitCostKrw] = useState<number>(4800);
   const [sellingPriceKrw, setSellingPriceKrw] = useState<number>(19900);
+  const [lengthCm, setLengthCm] = useState<number>(bundle.report.packageSpec?.lengthCm ?? 50);
+  const [widthCm, setWidthCm] = useState<number>(bundle.report.packageSpec?.widthCm ?? 35);
+  const [heightCm, setHeightCm] = useState<number>(bundle.report.packageSpec?.heightCm ?? 1.2);
+  const [weightG, setWeightG] = useState<number>(bundle.report.packageSpec?.weightG ?? 330);
+  const [usePromoRate, setUsePromoRate] = useState<boolean>(false);
 
   // Direct text edit (unlimited & free — browser-side template re-binding, no AI API call)
   const [headlineDraft, setHeadlineDraft] = useState<string>(bundle.detailContent.heroHeadline);
@@ -170,6 +176,12 @@ export default function ProjectWorkspacePage() {
         setBundle(hydrated);
         setUnitCostKrw(hydrated.report.pricingGuide.estimatedUnitCostKrw);
         setSellingPriceKrw(hydrated.report.pricingGuide.targetPriceKrw);
+        if (hydrated.report.packageSpec) {
+          setLengthCm(hydrated.report.packageSpec.lengthCm);
+          setWidthCm(hydrated.report.packageSpec.widthCm);
+          setHeightCm(hydrated.report.packageSpec.heightCm);
+          setWeightG(hydrated.report.packageSpec.weightG);
+        }
         setHeadlineDraft(hydrated.detailContent.heroHeadline);
         setSubheadlineDraft(hydrated.detailContent.heroSubheadline);
       } catch {
@@ -233,11 +245,20 @@ export default function ProjectWorkspacePage() {
     URL.revokeObjectURL(url);
   }
 
-  // Margin calculation (Coupang ~10.8% fee + ~3,000 KRW fulfillment/shipping)
+  // Margin calculation (Coupang ~10.8% fee + Coupang size/weight tier fulfillment)
   const coupangFee = Math.round(sellingPriceKrw * 0.108);
-  const fulfillmentCost = 3000;
-  const netProfit = sellingPriceKrw - unitCostKrw - coupangFee - fulfillmentCost;
+  const fulfillment = calculateCoupangFulfillment(
+    { lengthCm, widthCm, heightCm, weightG },
+    bundle.shippingMode,
+    usePromoRate,
+  );
+  const netProfit = sellingPriceKrw - unitCostKrw - coupangFee - fulfillment.totalFeeKrw;
   const marginPct = sellingPriceKrw > 0 ? Math.round((netProfit / sellingPriceKrw) * 1000) / 10 : 0;
+
+  const avgPrice = bundle.report.marketSnapshot.avgPriceKrw;
+  const maxPrice = bundle.report.marketSnapshot.maxPriceKrw ?? Math.round(avgPrice * 1.55);
+  const medianPrice = bundle.report.marketSnapshot.medianPriceKrw ?? Math.round(avgPrice * 0.92);
+  const minPrice = bundle.report.marketSnapshot.minPriceKrw ?? Math.round(avgPrice * 0.6);
 
   return (
     <div className="mx-auto max-w-6xl px-4 py-8 sm:px-6">
@@ -356,23 +377,35 @@ export default function ProjectWorkspacePage() {
 
             {/* Market Snapshot */}
             <div className="rounded-2xl border border-slate-200 bg-white p-6">
-              <h2 className="text-lg font-extrabold text-slate-900">쿠팡 시장 분석 요약</h2>
-              <div className="mt-4 grid gap-4 sm:grid-cols-3">
-                <div className="rounded-xl bg-slate-50 p-4">
-                  <span className="text-xs font-bold text-slate-500">상위 상품 평균가</span>
-                  <p className="mt-1 text-2xl font-black text-slate-900">
-                    {formatKrw(bundle.report.marketSnapshot.avgPriceKrw)}
-                  </p>
+              <h2 className="text-lg font-extrabold text-slate-900">쿠팡 시장 가격 분포 및 경쟁 현황</h2>
+              <div className="mt-4 grid gap-3 sm:grid-cols-4">
+                <div className="rounded-xl bg-slate-50 p-3.5">
+                  <span className="text-xs font-bold text-slate-500">최고 상품 가격</span>
+                  <p className="mt-1 text-xl font-black text-slate-900">{formatKrw(maxPrice)}</p>
                 </div>
-                <div className="rounded-xl bg-slate-50 p-4">
+                <div className="rounded-xl border border-blue-100 bg-blue-50/70 p-3.5">
+                  <span className="text-xs font-bold text-blue-700">평균 상품 가격</span>
+                  <p className="mt-1 text-xl font-black text-blue-700">{formatKrw(avgPrice)}</p>
+                </div>
+                <div className="rounded-xl bg-slate-50 p-3.5">
+                  <span className="text-xs font-bold text-slate-500">중간 상품 가격</span>
+                  <p className="mt-1 text-xl font-black text-slate-900">{formatKrw(medianPrice)}</p>
+                </div>
+                <div className="rounded-xl bg-slate-50 p-3.5">
+                  <span className="text-xs font-bold text-slate-500">최저 상품 가격</span>
+                  <p className="mt-1 text-xl font-black text-slate-700">{formatKrw(minPrice)}</p>
+                </div>
+              </div>
+              <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                <div className="rounded-xl bg-slate-50 p-3.5">
                   <span className="text-xs font-bold text-slate-500">로켓그로스 비중</span>
-                  <p className="mt-1 text-2xl font-black text-blue-600">
+                  <p className="mt-1 text-lg font-black text-blue-600">
                     {bundle.report.marketSnapshot.rocketGrowthSharePct}%
                   </p>
                 </div>
-                <div className="rounded-xl bg-slate-50 p-4">
+                <div className="rounded-xl bg-slate-50 p-3.5">
                   <span className="text-xs font-bold text-slate-500">진입 난이도</span>
-                  <p className="mt-1 text-2xl font-black text-emerald-700">
+                  <p className="mt-1 text-lg font-black text-emerald-700">
                     {bundle.report.marketSnapshot.competitionLevel}
                   </p>
                 </div>
@@ -443,27 +476,98 @@ export default function ProjectWorkspacePage() {
               </p>
 
               <div className="mt-4 space-y-3">
-                <div>
-                  <label className="block text-xs font-bold text-slate-700">
-                    1688 사입 원가 (원)
-                  </label>
-                  <input
-                    type="number"
-                    value={unitCostKrw}
-                    onChange={(e) => setUnitCostKrw(Number(e.target.value) || 0)}
-                    className="mt-1 h-11 w-full rounded-xl border border-slate-300 px-3 text-sm font-bold"
-                  />
+                <div className="grid grid-cols-2 gap-2.5">
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700">
+                      1688 사입 원가 (원)
+                    </label>
+                    <input
+                      type="number"
+                      value={unitCostKrw}
+                      onChange={(e) => setUnitCostKrw(Number(e.target.value) || 0)}
+                      className="mt-1 h-10 w-full rounded-xl border border-slate-300 px-3 text-sm font-bold"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700">
+                      쿠팡 판매가 (원)
+                    </label>
+                    <input
+                      type="number"
+                      value={sellingPriceKrw}
+                      onChange={(e) => setSellingPriceKrw(Number(e.target.value) || 0)}
+                      className="mt-1 h-10 w-full rounded-xl border border-slate-300 px-3 text-sm font-bold"
+                    />
+                  </div>
                 </div>
-                <div>
-                  <label className="block text-xs font-bold text-slate-700">
-                    쿠팡 판매가 (원)
-                  </label>
-                  <input
-                    type="number"
-                    value={sellingPriceKrw}
-                    onChange={(e) => setSellingPriceKrw(Number(e.target.value) || 0)}
-                    className="mt-1 h-11 w-full rounded-xl border border-slate-300 px-3 text-sm font-bold"
-                  />
+
+                {/* 1688 Package Size & Weight for Coupang Tier */}
+                <div className="rounded-xl border border-slate-200 bg-slate-50/70 p-3">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-extrabold text-slate-800">
+                      포장 규격 · 무게 (쿠팡 물류비 자동 산정)
+                    </span>
+                    <span className="rounded-full bg-blue-100 px-2 py-0.5 text-[11px] font-bold text-blue-800">
+                      {bundle.report.packageSpec?.source === "1688_extracted"
+                        ? "1688 실측 반영"
+                        : "AI 추정치"}
+                    </span>
+                  </div>
+                  <div className="mt-2 grid grid-cols-4 gap-1.5">
+                    <div>
+                      <label className="block text-[11px] font-semibold text-slate-600">가로(cm)</label>
+                      <input
+                        type="number"
+                        step="0.1"
+                        value={lengthCm}
+                        onChange={(e) => setLengthCm(Number(e.target.value) || 0)}
+                        className="mt-0.5 h-8 w-full rounded-lg border border-slate-300 bg-white px-2 text-xs font-bold"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[11px] font-semibold text-slate-600">세로(cm)</label>
+                      <input
+                        type="number"
+                        step="0.1"
+                        value={widthCm}
+                        onChange={(e) => setWidthCm(Number(e.target.value) || 0)}
+                        className="mt-0.5 h-8 w-full rounded-lg border border-slate-300 bg-white px-2 text-xs font-bold"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[11px] font-semibold text-slate-600">높이(cm)</label>
+                      <input
+                        type="number"
+                        step="0.1"
+                        value={heightCm}
+                        onChange={(e) => setHeightCm(Number(e.target.value) || 0)}
+                        className="mt-0.5 h-8 w-full rounded-lg border border-slate-300 bg-white px-2 text-xs font-bold"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[11px] font-semibold text-slate-600">무게(g)</label>
+                      <input
+                        type="number"
+                        value={weightG}
+                        onChange={(e) => setWeightG(Number(e.target.value) || 0)}
+                        className="mt-0.5 h-8 w-full rounded-lg border border-slate-300 bg-white px-2 text-xs font-bold"
+                      />
+                    </div>
+                  </div>
+                  <div className="mt-2 flex flex-wrap items-center justify-between gap-2 text-xs">
+                    <span className="font-extrabold text-blue-700">
+                      쿠팡 기준: {fulfillment.tier} ({fulfillment.sumCm}cm / {fulfillment.weightKg}kg)
+                    </span>
+                    {bundle.shippingMode === "rocket_growth" && (
+                      <button
+                        type="button"
+                        onClick={() => setUsePromoRate((prev) => !prev)}
+                        className="rounded-md border border-slate-300 bg-white px-2 py-0.5 text-[11px] font-bold text-slate-700 hover:bg-slate-100"
+                      >
+                        {usePromoRate ? "프로모션가 적용 중" : "정가 기준 (프로모션 전환)"}
+                      </button>
+                    )}
+                  </div>
                 </div>
               </div>
 
@@ -472,9 +576,18 @@ export default function ProjectWorkspacePage() {
                   <span>쿠팡 수수료 (약 10.8%)</span>
                   <span>-{formatKrw(coupangFee)}</span>
                 </div>
+                {fulfillment.inboundOutboundFeeKrw > 0 && (
+                  <div className="flex justify-between text-slate-600">
+                    <span>로켓 입출고비 ({fulfillment.tier})</span>
+                    <span>-{formatKrw(fulfillment.inboundOutboundFeeKrw)}</span>
+                  </div>
+                )}
                 <div className="flex justify-between text-slate-600">
-                  <span>예상 입출고/배송비</span>
-                  <span>-{formatKrw(fulfillmentCost)}</span>
+                  <span>
+                    {bundle.shippingMode === "rocket_growth" ? "로켓 배송비" : "일반 택배비"} (
+                    {fulfillment.tier})
+                  </span>
+                  <span>-{formatKrw(fulfillment.shippingFeeKrw)}</span>
                 </div>
                 <div className="flex justify-between border-t border-slate-200 pt-2 text-base font-black text-slate-900">
                   <span>개당 순이익</span>

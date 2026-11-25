@@ -9,11 +9,21 @@ export function buildFallbackPipelineOutput(input: SourcingInput) {
       productNameKo: `${brand} ${hint}`,
       categoryPath: "패션잡화 > 목도리/스카프 > 캐시미어/울 머플러",
       marketSnapshot: {
+        maxPriceKrw: 34900,
         avgPriceKrw: 21500,
+        medianPriceKrw: 19900,
+        minPriceKrw: 12900,
         rocketGrowthSharePct: 72,
         competitionLevel: "보통",
         summaryComment:
           "겨울 시즌 200×70cm 대폭 숄 겸용 머플러 수요가 높으며, 중량(330g)과 구김 없는 트윌 직조·실물 컬러 비교표를 제시한 상품의 구매전환율이 높습니다.",
+      },
+      packageSpec: {
+        lengthCm: 50,
+        widthCm: 35,
+        heightCm: 1.2,
+        weightG: 330,
+        source: "1688_extracted",
       },
       pricingGuide: {
         estimatedUnitCostCny: 24.16,

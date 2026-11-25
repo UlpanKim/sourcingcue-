@@ -11,6 +11,12 @@ export interface Sourced1688Product {
   attributes: Array<{ name: string; value: string }>;
   skuSummary: string[];
   mainImages: string[];
+  packageSpec?: {
+    lengthCm?: number;
+    widthCm?: number;
+    heightCm?: number;
+    weightG?: number;
+  };
 }
 
 const ALLOWED_1688_HOSTS = new Set(["detail.1688.com", "m.1688.com", "qr.1688.com"]);
@@ -170,6 +176,60 @@ function finalize(product: Sourced1688Product): Sourced1688Product | null {
   return product;
 }
 
+function extractPackageSpec(
+  data: Json,
+  attributes: Array<{ name: string; value: string }>,
+): Sourced1688Product["packageSpec"] {
+  let lengthCm: number | undefined;
+  let widthCm: number | undefined;
+  let heightCm: number | undefined;
+  let weightG: number | undefined;
+
+  const pkg = isObj(data.package_info)
+    ? data.package_info
+    : isObj(data.delivery_info)
+      ? data.delivery_info
+      : null;
+
+  if (pkg) {
+    const rawW = toPrice(pkg.weight ?? pkg.unit_weight ?? pkg.gross_weight);
+    if (rawW) {
+      // TMAPI/1688 delivery weight is often in kg if < 50, or grams if >= 50
+      weightG = rawW < 50 ? Math.round(rawW * 1000) : Math.round(rawW);
+    }
+    lengthCm = toPrice(pkg.length) ?? undefined;
+    widthCm = toPrice(pkg.width) ?? undefined;
+    heightCm = toPrice(pkg.height) ?? undefined;
+  }
+
+  for (const attr of attributes) {
+    const k = attr.name.toLowerCase();
+    const v = attr.value;
+    if (!weightG && (k.includes("중량") || k.includes("무게") || k.includes("克重") || k.includes("重量") || k.includes("weight"))) {
+      const mKg = v.match(/(\d+(?:\.\d+)?)\s*kg/i);
+      const mG = v.match(/(\d+(?:\.\d+)?)\s*(?:g|克)/i);
+      if (mKg) weightG = Math.round(Number(mKg[1]) * 1000);
+      else if (mG) weightG = Math.round(Number(mG[1]));
+    }
+    if ((!lengthCm || !widthCm) && (k.includes("사이즈") || k.includes("규격") || k.includes("치수") || k.includes("尺寸") || k.includes("包装"))) {
+      const m3 = v.match(/(\d+(?:\.\d+)?)\s*[*×xX]\s*(\d+(?:\.\d+)?)\s*[*×xX]\s*(\d+(?:\.\d+)?)/);
+      const m2 = v.match(/(\d+(?:\.\d+)?)\s*[*×xX]\s*(\d+(?:\.\d+)?)/);
+      if (m3) {
+        lengthCm = Number(m3[1]);
+        widthCm = Number(m3[2]);
+        heightCm = Number(m3[3]);
+      } else if (m2) {
+        lengthCm = Number(m2[1]);
+        widthCm = Number(m2[2]);
+        heightCm = heightCm ?? 2;
+      }
+    }
+  }
+
+  if (!lengthCm && !widthCm && !heightCm && !weightG) return undefined;
+  return { lengthCm, widthCm, heightCm, weightG };
+}
+
 async function fetchTmapi(itemId: string, apiKey: string): Promise<Sourced1688Product | null> {
   const json = await getJson(
     `https://api.tmapi.top/1688/item_detail?item_id=${encodeURIComponent(itemId)}&language=ko`,
@@ -180,15 +240,17 @@ async function fetchTmapi(itemId: string, apiKey: string): Promise<Sourced1688Pr
   if (!data) return null;
   const priceInfo = isObj(data.price_info) ? data.price_info : {};
   const tiered = isObj(data.tiered_price_info) ? data.tiered_price_info.prices : undefined;
+  const attributes = normalizeAttributes(data.product_props);
   return finalize({
     itemId,
     provider: "tmapi",
     title: str(data.title, 200),
     priceCny: toPrice(priceInfo.price) ?? toPrice(priceInfo.price_min) ?? toPrice(data.price),
     priceRange: normalizePriceRange(tiered ?? data.price_range ?? data.price_ranges),
-    attributes: normalizeAttributes(data.product_props),
+    attributes,
     skuSummary: normalizeSkuSummary(data.sku_props),
     mainImages: sanitizeImageUrls(data.main_imgs),
+    packageSpec: extractPackageSpec(data, attributes),
   });
 }
 

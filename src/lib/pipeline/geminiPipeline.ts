@@ -48,7 +48,8 @@ export async function runGeminiSourcingPipeline(
   "report": {
     "productNameKo": string,
     "categoryPath": string,
-    "marketSnapshot": { "avgPriceKrw": number, "rocketGrowthSharePct": number, "competitionLevel": "낮음"|"보통"|"높음", "summaryComment": string },
+    "marketSnapshot": { "maxPriceKrw": number, "avgPriceKrw": number, "medianPriceKrw": number, "minPriceKrw": number, "rocketGrowthSharePct": number, "competitionLevel": "낮음"|"보통"|"높음", "summaryComment": string },
+    "packageSpec": { "lengthCm": number, "widthCm": number, "heightCm": number, "weightG": number, "source": "1688_extracted"|"ai_estimated" },
     "pricingGuide": { "estimatedUnitCostCny": number, "estimatedUnitCostKrw": number, "launchPriceKrw": number, "targetPriceKrw": number, "estimatedMarginPct": number },
     "titleCandidates": string[],
     "searchTags": string[],
@@ -89,6 +90,7 @@ export async function runGeminiSourcingPipeline(
                   value: sanitizeUntrustedText(a.value),
                 })),
                 skuSummary: sourced.skuSummary.map(sanitizeUntrustedText),
+                packageSpec: sourced.packageSpec,
               },
             }
           : {}),
@@ -180,6 +182,15 @@ export async function runGeminiSourcingPipeline(
             }
           }
           parsed = PipelineOutputSchema.parse(candidateJson);
+          if (sourced?.packageSpec) {
+            parsed.report.packageSpec = {
+              lengthCm: sourced.packageSpec.lengthCm ?? parsed.report.packageSpec?.lengthCm ?? 30,
+              widthCm: sourced.packageSpec.widthCm ?? parsed.report.packageSpec?.widthCm ?? 20,
+              heightCm: sourced.packageSpec.heightCm ?? parsed.report.packageSpec?.heightCm ?? 10,
+              weightG: sourced.packageSpec.weightG ?? parsed.report.packageSpec?.weightG ?? 500,
+              source: "1688_extracted",
+            };
+          }
           isLiveGemini = true;
           usedModel = configuredModel;
         }
