@@ -98,6 +98,26 @@ export const DetailPageContentSchema = z.object({
     importer: z.string().max(200),
     careInstruction: z.string().max(300),
   }),
+  comparisonRows: z
+    .array(
+      z.object({
+        label: z.string().max(80),
+        genericProduct: z.string().max(120),
+        ourProduct: z.string().max(120),
+      }),
+    )
+    .optional(),
+  usageScenarios: z
+    .array(
+      z.object({
+        tag: z.string().max(40),
+        title: z.string().max(120),
+        description: z.string().max(240),
+      }),
+    )
+    .optional(),
+  packageContents: z.array(z.string().max(120)).optional(),
+  careTips: z.array(z.string().max(200)).optional(),
 });
 
 export type DetailPageContent = z.infer<typeof DetailPageContentSchema>;

@@ -119,6 +119,43 @@ export function buildFallbackPipelineOutput(input: SourcingInput) {
           question: "세탁 및 관리는 어떻게 하나요?",
           answer: "드라이클리닝을 권장하며, 가정 세탁 시 30℃ 이하 미지근한 물에 중성세제로 단독 손세탁 후 그늘에 뉘어 건조해 주세요.",
         },
+        {
+          question: "선물용으로 보내도 괜찮은 포장인가요?",
+          answer: "개별 OPP 포장(50×35×1.2cm) 상태로 구김 없이 접어 발송되며, 별도 선물 포장 여부는 판매자 옵션을 확인해 주세요.",
+        },
+      ],
+      comparisonRows: [
+        { label: "사이즈", genericProduct: "180×30cm 내외 일반 폭", ourProduct: "200×70cm 대폭 (숄 겸용)" },
+        { label: "중량감", genericProduct: "150g 내외로 얇고 처짐", ourProduct: "약 330g 도톰한 고중량" },
+        { label: "직조 방식", genericProduct: "평직 위주, 구김 잘 생김", ourProduct: "사선 트윌(능직) 직조" },
+        { label: "활용도", genericProduct: "목도리 단일 용도", ourProduct: "목도리·숄·무릎담요 3-WAY" },
+      ],
+      usageScenarios: [
+        {
+          tag: "출퇴근",
+          title: "찬바람 부는 출근길",
+          description: "코트·패딩 위에 두 번 감아 목과 어깨까지 넉넉하게 감싸 보온감을 더합니다.",
+        },
+        {
+          tag: "오피스",
+          title: "냉방·난방 차이 큰 사무실",
+          description: "70cm 대폭을 펼쳐 어깨 숄이나 무릎담요로 걸쳐 두면 실내에서도 활용도가 높습니다.",
+        },
+        {
+          tag: "선물",
+          title: "연말·기념일 선물",
+          description: "남녀 공용 솔리드 컬러로 취향을 크게 타지 않아 커플템이나 부모님 선물로 고르기 좋습니다.",
+        },
+      ],
+      packageContents: [
+        "대폭 숄 머플러 1장 (200×70cm)",
+        "개별 OPP 포장 1개",
+        "세탁·취급 안내 라벨 (제품 부착)",
+      ],
+      careTips: [
+        "드라이클리닝을 권장하며, 손세탁 시 30℃ 이하 미온수와 중성세제를 사용해 주세요.",
+        "비틀어 짜지 말고 수건으로 눌러 물기를 뺀 뒤 그늘에 뉘어 건조해 주세요.",
+        "보풀이 생기면 보풀 제거기로 가볍게 정리하고, 보관 시 접어서 통풍이 잘 되는 곳에 두세요.",
       ],
       productNotice: {
         itemName: `${brand} 대폭 숄 머플러 (A109109)`,

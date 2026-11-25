@@ -44,7 +44,12 @@ function createDemoBundle(): GeneratedBundle {
     isLiveGemini: false,
     report: fallback.report,
     detailContent: fallback.detailContent,
-    detailHtml: renderDetailHtml(fallback.detailContent, "데일리굿즈"),
+    detailHtml: renderDetailHtml(
+      fallback.detailContent,
+      "데일리굿즈",
+      IMAGE_SLOTS.map((slot) => slot.imgUrl),
+    ),
+    mainImages: IMAGE_SLOTS.map((slot) => slot.imgUrl),
   };
 }
 
@@ -157,7 +162,7 @@ export default function ProjectWorkspacePage() {
           detailHtml: renderDetailHtml(
             detailRes.data,
             safeBrand || "셀러원큐 셀렉트",
-            safeMainImages[0],
+            safeMainImages,
           ),
           mainImages: safeMainImages,
           sourcingProvider: safeProvider,
@@ -206,7 +211,7 @@ export default function ProjectWorkspacePage() {
       detailHtml: renderDetailHtml(
         updatedContent,
         bundle.brandName || "셀러원큐 셀렉트",
-        bundle.mainImages?.[0],
+        bundle.mainImages,
       ),
     });
     setEditNotice("직접 텍스트 수정이 반영되었습니다. (AI API 호출 없음 · 무제한 무료)");
@@ -217,7 +222,7 @@ export default function ProjectWorkspacePage() {
     const safeHtml = renderDetailHtml(
       bundle.detailContent,
       bundle.brandName || "셀러원큐 셀렉트",
-      bundle.mainImages?.[0],
+      bundle.mainImages,
     );
     const blob = new Blob([safeHtml], { type: "text/html;charset=utf-8" });
     const url = URL.createObjectURL(blob);

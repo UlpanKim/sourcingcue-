@@ -41,7 +41,8 @@ export async function runGeminiSourcingPipeline(
 1. searchTags는 정확히 20개의 한국어 쿠팡 검색 태그 배열로 작성하세요.
 2. keySellingPoints는 정확히 3개, benefits는 정확히 3개, titleCandidates는 3~5개로 작성하세요.
 3. '1위', '완벽', '100%' 같은 무증빙 최상급 과장표현은 금지하고 실측 수치 근거를 포함하세요.
-3-1. sourced1688 데이터가 있으면 실제 1688 상품명·가격(CNY)·속성·SKU를 근거로 분석하고 estimatedUnitCostCny에 반영하세요.
+3-1. detailContent.faqs는 4~5개, comparisonRows는 정확히 4개(일반 저가형 대비 실측 차이; label 80자·각 값 120자 이내), usageScenarios는 3개(tag 40자·title 120자·description 240자 이내), packageContents는 2~4개, careTips는 3개로 작성하세요. 비교표·추천 시나리오에서도 무증빙 최상급 표현은 금지하고 구체적 스펙 수치를 근거로 쓰세요.
+3-2. sourced1688 데이터가 있으면 실제 1688 상품명·가격(CNY)·속성·SKU를 근거로 분석하고 estimatedUnitCostCny에 반영하세요.
 4. 반드시 아래 JSON 스키마 구조를 정확히 따르세요:
 {
   "report": {
@@ -64,7 +65,11 @@ export async function runGeminiSourcingPipeline(
     "specs": [{ "label": string, "value": string }],
     "sizeGuideNote": string,
     "faqs": [{ "question": string, "answer": string }],
-    "productNotice": { "itemName": string, "material": string, "origin": string, "importer": string, "careInstruction": string }
+    "productNotice": { "itemName": string, "material": string, "origin": string, "importer": string, "careInstruction": string },
+    "comparisonRows": [{ "label": string, "genericProduct": string, "ourProduct": string }],
+    "usageScenarios": [{ "tag": string, "title": string, "description": string }],
+    "packageContents": string[],
+    "careTips": string[]
   }
 }`;
 
@@ -111,7 +116,7 @@ export async function runGeminiSourcingPipeline(
             generationConfig: {
               responseMimeType: "application/json",
               temperature: 0.4,
-              maxOutputTokens: 4096,
+              maxOutputTokens: 6144,
               thinkingConfig: { thinkingBudget: 0 },
             },
           }),
@@ -169,6 +174,11 @@ export async function runGeminiSourcingPipeline(
             }
             candidateJson.detailContent.faqs = faqs;
           }
+          if (candidateJson?.detailContent) {
+            for (const key of ["comparisonRows", "usageScenarios", "packageContents", "careTips"]) {
+              if (!Array.isArray(candidateJson.detailContent[key])) delete candidateJson.detailContent[key];
+            }
+          }
           parsed = PipelineOutputSchema.parse(candidateJson);
           isLiveGemini = true;
           usedModel = configuredModel;
@@ -186,7 +196,7 @@ export async function runGeminiSourcingPipeline(
   const detailHtml = renderDetailHtml(
     parsed.detailContent,
     input.brandName || "셀러원큐 셀렉트",
-    sourced?.mainImages[0],
+    sourced?.mainImages,
   );
 
   return {
