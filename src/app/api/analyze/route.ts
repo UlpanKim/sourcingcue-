@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { getServerSession } from "@/lib/auth/session";
 import { SourcingInputSchema } from "@/lib/pipeline/schemas";
 import { runGeminiSourcingPipeline } from "@/lib/pipeline/geminiPipeline";
 import { checkRateLimit, getClientIp, isPayloadTooLarge } from "@/lib/security/rateLimit";
@@ -6,6 +7,11 @@ import { checkRateLimit, getClientIp, isPayloadTooLarge } from "@/lib/security/r
 export const maxDuration = 60;
 
 export async function POST(req: Request) {
+  const session = await getServerSession();
+  if (!session) {
+    return NextResponse.json({ error: "로그인이 필요합니다." }, { status: 401 });
+  }
+
   if (isPayloadTooLarge(req, 4096)) {
     return NextResponse.json({ error: "요청 크기가 허용 한도를 초과했습니다." }, { status: 413 });
   }

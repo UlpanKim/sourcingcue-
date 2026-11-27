@@ -53,6 +53,11 @@ export default function HomePage() {
           productHint: productHint.trim(),
         }),
       });
+      if (res.status === 401) {
+        setIsLoading(false);
+        router.push("/login?next=/");
+        return;
+      }
       const data = await res.json();
       if (!res.ok) {
         setErrorMsg(data.error || "분석에 실패했습니다. 생성 횟수는 차감되지 않았습니다.");

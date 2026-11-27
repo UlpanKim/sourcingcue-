@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
+import { getServerSession } from "@/lib/auth/session";
 import { PLANS } from "@/lib/billing/plans";
 import { checkRateLimit, getClientIp, isPayloadTooLarge } from "@/lib/security/rateLimit";
 
@@ -135,6 +136,11 @@ async function verifyBootpayBillingKey(
 }
 
 export async function POST(req: Request) {
+  const session = await getServerSession();
+  if (!session) {
+    return NextResponse.json({ error: "결제를 진행하려면 먼저 로그인해 주세요." }, { status: 401 });
+  }
+
   if (isPayloadTooLarge(req, 4096)) {
     return NextResponse.json({ error: "요청 크기가 허용 한도를 초과했습니다." }, { status: 413 });
   }
@@ -160,6 +166,7 @@ export async function POST(req: Request) {
     }
 
     const { planId, cycle, idempotencyKey, receiptId } = parsed.data;
+    const scopedIdempotencyKey = `${session.id}:${idempotencyKey}`;
     const allowSandbox = isSandboxAllowed();
 
     if (!allowSandbox && !receiptId) {
@@ -169,7 +176,7 @@ export async function POST(req: Request) {
       );
     }
 
-    const existing = processedSubscriptions.get(idempotencyKey);
+    const existing = processedSubscriptions.get(scopedIdempotencyKey);
     if (existing) {
       return NextResponse.json({ ...existing, idempotentReplay: true }, { status: 200 });
     }
@@ -229,7 +236,7 @@ export async function POST(req: Request) {
       const firstKey = processedSubscriptions.keys().next().value;
       if (firstKey) processedSubscriptions.delete(firstKey);
     }
-    processedSubscriptions.set(idempotencyKey, result);
+    processedSubscriptions.set(scopedIdempotencyKey, result);
 
     return NextResponse.json({ ...result, idempotentReplay: false }, { status: 200 });
   } catch {
